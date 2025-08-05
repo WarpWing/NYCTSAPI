@@ -193,4 +193,4 @@ def _make_envelope(data):
     }
 
 if __name__ == '__main__':
-    app.run(port=5050,use_reloader=False)
+    app.run(use_reloader=True)
