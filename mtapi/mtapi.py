@@ -1,4 +1,4 @@
-import urllib, contextlib, datetime, copy
+import urllib.request, urllib.error, contextlib, datetime, copy
 from collections import defaultdict
 from itertools import islice
 from operator import itemgetter
@@ -214,6 +214,25 @@ class Mtapi(object):
             out = [ self._stations[k].serialize() for k in ids ]
 
         return out
+
+    def search_stations(self, query):
+        query = query.lower().strip()
+        if not query:
+            return []
+
+        with self._read_lock:
+            matches = []
+            for station_id, station in self._stations.items():
+                station_name = station['name'].lower()
+                if query in station_name:
+                    matches.append({
+                        'id': station_id,
+                        'name': station['name'],
+                        'location': station['location']
+                    })
+            
+        matches.sort(key=lambda x: x['name'])
+        return matches
 
     def is_expired(self):
         if self._THREADED and self.threader and self.threader.restart_if_dead():
