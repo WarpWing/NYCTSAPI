@@ -155,6 +155,25 @@ def routes():
         'updated': mta.last_update()
         }
 
+@app.route('/search', methods=['GET'])
+@response_wrapper
+def search_stations():
+    try:
+        query = request.args['q']
+    except KeyError as e:
+        resp = Response(
+            response=json.dumps({'error': 'Missing q parameter'}),
+            status=400,
+            mimetype="application/json"
+        )
+        return add_cors_header(resp)
+
+    data = mta.search_stations(query)
+    return {
+        'data': data,
+        'updated': mta.last_update()
+    }
+
 def _envelope_reduce(a, b):
     if a['last_update'] and b['last_update']:
         return a if a['last_update'] < b['last_update'] else b
@@ -174,4 +193,4 @@ def _make_envelope(data):
     }
 
 if __name__ == '__main__':
-    app.run(use_reloader=False)
+    app.run(use_reloader=True)
