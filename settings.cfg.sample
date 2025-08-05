@@ -1,8 +1,8 @@
 MTA_KEY = 'your-mta-key-here'
 STATIONS_FILE = './data/stations.json'
-CROSS_ORIGIN = 'http://yourdomain.com'
+CROSS_ORIGIN = 'https://mtapi-11p8.onrender.com'
 MAX_TRAINS=10
 MAX_MINUTES=30
-CACHE_SECONDS=60
+CACHE_SECONDS=10
 THREADED=True
 DEBUG = True
