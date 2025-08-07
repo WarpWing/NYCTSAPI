@@ -1,4 +1,4 @@
-g MTA API - Multi-Modal Realtime Transit Data
+MTA API - Multi-Modal Realtime Transit Data
 
 MTAPI is a comprehensive HTTP server that provides realtime transit data for NYC Subway, LIRR (Long Island Rail Road), and Metro-North Railroad (MNR). The API converts MTA's Protocol Buffer feeds to JSON, now with MNR and LIRR search, outages, alerts and more!
 
