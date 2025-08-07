@@ -38,8 +38,13 @@ brew install python3 git
 
 ### 1. Clone the Repository
 ```bash
-git clone https://github.com/your-username/MTAPI.git
-cd MTAPI
+git clone https://github.com/WarpWing/NYCTSAPI.git
+cd NYCTSAPI
+```
+
+**Note:** This repository uses Git LFS for large data files. Make sure you have Git LFS installed:
+```bash
+git lfs install
 ```
 
 ### 2. Set Up Virtual Environment
@@ -209,7 +214,33 @@ This creates `openapi.json` and `openapi.yaml` files compatible with Swagger UI 
 - **THREADED**: Enable background refresh (default: True)
 - **DEBUG**: Flask debug mode (default: False)
 
-## Docker Deployment
+## Deployment
+
+### Render.com Deployment
+
+This repository includes a `render.yml` configuration file for easy deployment on Render.com:
+
+1. **Fork or clone this repository**
+2. **Connect to Render.com:**
+   - Go to [Render.com](https://render.com)
+   - Connect your GitHub account
+   - Create a new "Web Service" 
+   - Select this repository
+
+3. **Render will automatically:**
+   - Install Git LFS and pull large data files
+   - Download GTFS data from MTA endpoints
+   - Generate station files
+   - Download realtime feeds and alerts
+   - Start the API server with gunicorn
+
+4. **Environment Variables:**
+   - Set `MTA_KEY` in Render dashboard with your MTA API key
+   - Get your key from: https://api.mta.info/
+
+The `render.yml` handles all data downloads automatically during deployment, so no manual data setup is required.
+
+### Docker Deployment
 
 ```dockerfile
 FROM python:3.9-slim
