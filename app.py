@@ -10,6 +10,7 @@
 """
 
 from mtapi.mtapi import Mtapi
+from mtapi.regional_api import LIRRApi, MNRApi, OutageAPI, AlertAPI
 from flask import Flask, request, Response, render_template, abort, redirect
 import json
 from datetime import datetime
@@ -58,6 +59,23 @@ mta = Mtapi(
     max_minutes=app.config['MAX_MINUTES'],
     expires_seconds=app.config['CACHE_SECONDS'],
     threaded=app.config['THREADED'])
+
+# Initialize regional APIs
+lirr = LIRRApi(
+    app.config['MTA_KEY'],
+    expires_seconds=app.config['CACHE_SECONDS'],
+    max_trains=app.config['MAX_TRAINS'],
+    max_minutes=240)
+
+mnr = MNRApi(
+    app.config['MTA_KEY'],
+    expires_seconds=app.config['CACHE_SECONDS'],
+    max_trains=app.config['MAX_TRAINS'],
+    max_minutes=240)
+
+# Initialize outage and alert APIs
+outage_api = OutageAPI()
+alert_api = AlertAPI()
 
 def response_wrapper(f):
     @wraps(f)
@@ -190,6 +208,283 @@ def _make_envelope(data):
     return {
         'data': data,
         'updated': time
+    }
+
+# LIRR endpoints
+@app.route('/lirr/routes', methods=['GET'])
+@response_wrapper
+def lirr_routes():
+    return {
+        'data': sorted(lirr.get_routes()),
+        'updated': lirr.last_update()
+    }
+
+@app.route('/lirr/stops', methods=['GET'])
+@response_wrapper
+def lirr_stops():
+    return {
+        'data': lirr.get_stops(),
+        'updated': lirr.last_update()
+    }
+
+@app.route('/lirr/by-route/<route>', methods=['GET'])
+@response_wrapper
+def lirr_by_route(route):
+    try:
+        data = lirr.get_stops_by_route(route)
+        return {
+            'data': data,
+            'updated': lirr.last_update()
+        }
+    except Exception as e:
+        resp = Response(
+            response=json.dumps({'error': 'Route not found'}),
+            status=404,
+            mimetype="application/json"
+        )
+        return add_cors_header(resp)
+
+@app.route('/lirr/by-id/<stop_id>', methods=['GET'])
+@response_wrapper
+def lirr_by_id(stop_id):
+    try:
+        data = lirr.get_stop_by_id(stop_id)
+        if data:
+            return {
+                'data': [data],
+                'updated': lirr.last_update()
+            }
+        else:
+            resp = Response(
+                response=json.dumps({'error': 'Stop not found'}),
+                status=404,
+                mimetype="application/json"
+            )
+            return add_cors_header(resp)
+    except Exception as e:
+        resp = Response(
+            response=json.dumps({'error': 'Stop not found'}),
+            status=404,
+            mimetype="application/json"
+        )
+        return add_cors_header(resp)
+
+@app.route('/lirr/search', methods=['GET'])
+@response_wrapper
+def lirr_search():
+    try:
+        query = request.args['q']
+    except KeyError as e:
+        resp = Response(
+            response=json.dumps({'error': 'Missing q parameter'}),
+            status=400,
+            mimetype="application/json"
+        )
+        return add_cors_header(resp)
+    
+    data = lirr.search_stops(query)
+    return {
+        'data': data,
+        'updated': lirr.last_update()
+    }
+
+@app.route('/lirr/by-location', methods=['GET'])
+@response_wrapper
+def lirr_by_location():
+    try:
+        location = (float(request.args['lat']), float(request.args['lon']))
+    except KeyError as e:
+        resp = Response(
+            response=json.dumps({'error': 'Missing lat/lon parameter'}),
+            status=400,
+            mimetype="application/json"
+        )
+        return add_cors_header(resp)
+    
+    data = lirr.get_by_location(location, 5)
+    return {
+        'data': data,
+        'updated': lirr.last_update()
+    }
+
+# MNR endpoints
+@app.route('/mnr/routes', methods=['GET'])
+@response_wrapper
+def mnr_routes():
+    return {
+        'data': sorted(mnr.get_routes()),
+        'updated': mnr.last_update()
+    }
+
+@app.route('/mnr/stops', methods=['GET'])
+@response_wrapper
+def mnr_stops():
+    return {
+        'data': mnr.get_stops(),
+        'updated': mnr.last_update()
+    }
+
+@app.route('/mnr/by-route/<route>', methods=['GET'])
+@response_wrapper
+def mnr_by_route(route):
+    try:
+        data = mnr.get_stops_by_route(route)
+        return {
+            'data': data,
+            'updated': mnr.last_update()
+        }
+    except Exception as e:
+        resp = Response(
+            response=json.dumps({'error': 'Route not found'}),
+            status=404,
+            mimetype="application/json"
+        )
+        return add_cors_header(resp)
+
+@app.route('/mnr/by-id/<stop_id>', methods=['GET'])
+@response_wrapper
+def mnr_by_id(stop_id):
+    try:
+        data = mnr.get_stop_by_id(stop_id)
+        if data:
+            return {
+                'data': [data],
+                'updated': mnr.last_update()
+            }
+        else:
+            resp = Response(
+                response=json.dumps({'error': 'Stop not found'}),
+                status=404,
+                mimetype="application/json"
+            )
+            return add_cors_header(resp)
+    except Exception as e:
+        resp = Response(
+            response=json.dumps({'error': 'Stop not found'}),
+            status=404,
+            mimetype="application/json"
+        )
+        return add_cors_header(resp)
+
+@app.route('/mnr/search', methods=['GET'])
+@response_wrapper
+def mnr_search():
+    try:
+        query = request.args['q']
+    except KeyError as e:
+        resp = Response(
+            response=json.dumps({'error': 'Missing q parameter'}),
+            status=400,
+            mimetype="application/json"
+        )
+        return add_cors_header(resp)
+    
+    data = mnr.search_stops(query)
+    return {
+        'data': data,
+        'updated': mnr.last_update()
+    }
+
+@app.route('/mnr/by-location', methods=['GET'])
+@response_wrapper
+def mnr_by_location():
+    try:
+        location = (float(request.args['lat']), float(request.args['lon']))
+    except KeyError as e:
+        resp = Response(
+            response=json.dumps({'error': 'Missing lat/lon parameter'}),
+            status=400,
+            mimetype="application/json"
+        )
+        return add_cors_header(resp)
+    
+    data = mnr.get_by_location(location, 5)
+    return {
+        'data': data,
+        'updated': mnr.last_update()
+    }
+
+# Outage endpoints
+@app.route('/outages/search', methods=['GET'])
+@response_wrapper
+def search_outages():
+    try:
+        station = request.args['station']
+    except KeyError as e:
+        resp = Response(
+            response=json.dumps({'error': 'Missing station parameter'}),
+            status=400,
+            mimetype="application/json"
+        )
+        return add_cors_header(resp)
+    
+    data = outage_api.search_outages(station)
+    return data
+
+# Alert endpoints
+@app.route('/alerts/search', methods=['GET'])
+@response_wrapper
+def search_alerts():
+    try:
+        query = request.args['q']
+        service_type = request.args.get('service', 'all')
+    except KeyError as e:
+        resp = Response(
+            response=json.dumps({'error': 'Missing q parameter'}),
+            status=400,
+            mimetype="application/json"
+        )
+        return add_cors_header(resp)
+    
+    data = alert_api.search_alerts(query, service_type)
+    return data
+
+# Route planning endpoint
+@app.route('/route-plan', methods=['GET'])
+@response_wrapper
+def route_plan():
+    try:
+        from_lat = float(request.args['from_lat'])
+        from_lon = float(request.args['from_lon'])
+        to_lat = float(request.args['to_lat'])
+        to_lon = float(request.args['to_lon'])
+    except (KeyError, ValueError) as e:
+        resp = Response(
+            response=json.dumps({'error': 'Missing or invalid from_lat, from_lon, to_lat, to_lon parameters'}),
+            status=400,
+            mimetype="application/json"
+        )
+        return add_cors_header(resp)
+    
+    from_point = (from_lat, from_lon)
+    to_point = (to_lat, to_lon)
+    
+    # Simple multi-modal routing - find nearest subway, LIRR, and MNR stops
+    subway_from = mta.get_by_point(from_point, 3)
+    subway_to = mta.get_by_point(to_point, 3)
+    lirr_from = lirr.get_by_location(from_point, 3)
+    lirr_to = lirr.get_by_location(to_point, 3)
+    mnr_from = mnr.get_by_location(from_point, 3)
+    mnr_to = mnr.get_by_location(to_point, 3)
+    
+    return {
+        'from_point': from_point,
+        'to_point': to_point,
+        'options': {
+            'subway': {
+                'from_stations': subway_from,
+                'to_stations': subway_to
+            },
+            'lirr': {
+                'from_stations': lirr_from,
+                'to_stations': lirr_to
+            },
+            'mnr': {
+                'from_stations': mnr_from,
+                'to_stations': mnr_to
+            }
+        },
+        'note': 'This is a basic proximity-based route suggestion. For detailed routing, use dedicated trip planning services.'
     }
 
 if __name__ == '__main__':
