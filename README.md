@@ -1,8 +1,8 @@
-MTA API - Multi-Modal Realtime Transit Data
+New York City Transit API (MRN + LIRR Support)
 
 MTAPI is a comprehensive HTTP server that provides realtime transit data for NYC Subway, LIRR (Long Island Rail Road), and Metro-North Railroad (MNR). The API converts MTA's Protocol Buffer feeds to JSON, now with MNR and LIRR search, outages, alerts and more!
 
-**Massive credit and thanks to [Jon Thornton](https://github.com/jonthornton) for the original MTAPI project.** This fork builds upon his excellent foundation to add multi-modal support and advanced search features. Original project: https://github.com/jonthornton/MTAPI
+**Massive credit and thanks to [Jon Thornton](https://github.com/jonthornton) for the original MTAPI project.** This fork builds upon his excellent foundation to add multi-rail system support and advanced search features. Original project: https://github.com/jonthornton/MTAPI
 
 
 ## Prerequisites
@@ -213,32 +213,6 @@ This creates `openapi.json` and `openapi.yaml` files compatible with Swagger UI 
 - **CACHE_SECONDS**: Data refresh interval (default: 60)
 - **THREADED**: Enable background refresh (default: True)
 - **DEBUG**: Flask debug mode (default: False)
-
-## Deployment
-
-### Render.com Deployment
-
-This repository includes a `render.yml` configuration file for easy deployment on Render.com:
-
-1. **Fork or clone this repository**
-2. **Connect to Render.com:**
-   - Go to [Render.com](https://render.com)
-   - Connect your GitHub account
-   - Create a new "Web Service" 
-   - Select this repository
-
-3. **Render will automatically:**
-   - Install Git LFS and pull large data files
-   - Download GTFS data from MTA endpoints
-   - Generate station files
-   - Download realtime feeds and alerts
-   - Start the API server with gunicorn
-
-4. **Environment Variables:**
-   - Set `MTA_KEY` in Render dashboard with your MTA API key
-   - Get your key from: https://api.mta.info/
-
-The `render.yml` handles all data downloads automatically during deployment, so no manual data setup is required.
 
 ### Docker Deployment
 
