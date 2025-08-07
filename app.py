@@ -81,8 +81,8 @@ alert_api = AlertAPI()
 # Initialize unified station search
 unified_search = UnifiedStationSearch(
     app.config['STATIONS_FILE'],
-    '/home/ubuntu/misc/mrnlirr/MTAPI/data/mnr-stations.json',
-    '/home/ubuntu/misc/mrnlirr/MTAPI/data/lirr-stations.json'
+    'data/mnr-stations.json',
+    'data/lirr-stations.json'
 )
 
 def response_wrapper(f):
