@@ -1,7 +1,10 @@
 ## Endpoints
 
-- **/by-location?lat=[latitude]&lon=[longitude]**  
-Returns the 5 stations nearest the provided lat/lon pair.
+- **/by-location?lat=[latitude]&lon=[longitude]&system=[system]&limit=[limit]&radius=[radius]**  
+Returns stations nearest the provided lat/lon pair.
+  - `system` (optional): Filter by transit system - `all`, `subway`, `mnr`, `lirr` (default: `subway`)
+  - `limit` (optional): Maximum number of results (default: 5)
+  - `radius` (optional): Search radius in degrees (default: 0.01, only used for multi-system search)
 ```javascript
 {
     "data": [
@@ -98,6 +101,37 @@ Returns the 5 stations nearest the provided lat/lon pair.
         ...
     ],
     "updated": "2014-08-29T15:27:27-04:00"
+}
+```
+
+**Multi-System Location Search Example:**
+```javascript
+// GET /by-location?lat=40.7589&lon=-73.9851&system=all&limit=3
+{
+    "data": [
+        {
+            "id": "127",
+            "name": "Times Sq-42 St",
+            "location": [40.7589, -73.9851],
+            "system": "subway",
+            "distance": 0.0001
+        },
+        {
+            "id": "1",
+            "name": "Grand Central",
+            "location": [40.752998, -73.977056],
+            "system": "mnr",
+            "distance": 0.0089
+        },
+        {
+            "id": "102",
+            "name": "Jamaica",
+            "location": [40.69960817, -73.80852987],
+            "system": "lirr",
+            "distance": 0.1823
+        }
+    ],
+    "updated": null
 }
 ```
 
@@ -220,4 +254,52 @@ Lists available routes.
     ],
     "updated": "2014-08-29T15:09:57-04:00"
 }
+```
+
+- **/search?q=[query]&system=[system]**  
+Search for stations by name with keyword support across multiple transit systems.
+  - `q` (required): Search query - supports multiple keywords (e.g., "grand central")
+  - `system` (optional): Filter by transit system - `all`, `subway`, `mnr`, `lirr` (default: `all`)
+
+**Features:**
+- **Keyword matching**: "grand central" finds "Grand Central Terminal"
+- **Partial word matching**: "grand" matches "Grand Central" 
+- **Multi-word search**: All keywords must match
+- **Smart ordering**: Exact matches first, then substring matches, then partial matches
+- **Multi-system**: Search across subway, MNR, and LIRR simultaneously
+
+```javascript
+// GET /search?q=grand%20central&system=all
+{
+    "data": [
+        {
+            "id": "1",
+            "name": "Grand Central",
+            "location": [40.752998, -73.977056],
+            "system": "mnr"
+        },
+        {
+            "id": "456",
+            "name": "Grand Central-42 St",
+            "location": [40.751431, -73.976041],
+            "system": "subway"
+        }
+    ],
+    "updated": null
+}
+```
+
+**Search Examples:**
+```javascript
+// Single keyword
+GET /search?q=jamaica&system=all
+// Returns Jamaica stations from LIRR and subway
+
+// Multiple keywords  
+GET /search?q=union%20square&system=subway
+// Returns Union Sq stations from subway only
+
+// Partial matching
+GET /search?q=grand&system=mnr  
+// Returns Grand Central and other "Grand" stations from MNR
 ```

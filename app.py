@@ -11,6 +11,7 @@
 
 from mtapi.mtapi import Mtapi
 from mtapi.regional_api import LIRRApi, MNRApi, OutageAPI, AlertAPI
+from mtapi.unified_search import UnifiedStationSearch
 from flask import Flask, request, Response, render_template, abort, redirect
 import json
 from datetime import datetime
@@ -77,6 +78,13 @@ mnr = MNRApi(
 outage_api = OutageAPI()
 alert_api = AlertAPI()
 
+# Initialize unified station search
+unified_search = UnifiedStationSearch(
+    app.config['STATIONS_FILE'],
+    '/home/ubuntu/misc/mrnlirr/MTAPI/data/mnr-stations.json',
+    '/home/ubuntu/misc/mrnlirr/MTAPI/data/lirr-stations.json'
+)
+
 def response_wrapper(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -116,19 +124,39 @@ def index():
 @response_wrapper
 def by_location():
     try:
-        location = (float(request.args['lat']), float(request.args['lon']))
-    except KeyError as e:
+        lat = float(request.args['lat'])
+        lon = float(request.args['lon'])
+        system_filter = request.args.get('system', 'subway')  # default to subway for backward compatibility
+        limit = int(request.args.get('limit', '5'))
+        radius = float(request.args.get('radius', '0.01'))
+    except (KeyError, ValueError) as e:
         print(e)
         resp = Response(
-            response=json.dumps({'error': 'Missing lat/lon parameter'}),
+            response=json.dumps({'error': 'Missing or invalid lat/lon parameter'}),
             status=400,
             mimetype="application/json"
         )
-
         return add_cors_header(resp)
 
-    data = mta.get_by_point(location, 5)
-    return _make_envelope(data)
+    if system_filter == 'subway':
+        # Use original subway search for backward compatibility
+        data = mta.get_by_point((lat, lon), limit)
+        return _make_envelope(data)
+    elif system_filter == 'all':
+        # Use unified search for all systems
+        data = unified_search.search_by_location(lat, lon, radius, limit)
+        return {
+            'data': data,
+            'updated': None
+        }
+    else:
+        # Filter by specific system using unified search
+        data = unified_search.search_by_location(lat, lon, radius, limit * 3)  # Get more, then filter
+        filtered_data = [station for station in data if station.get('system') == system_filter][:limit]
+        return {
+            'data': filtered_data,
+            'updated': None
+        }
 
 @app.route('/by-route/<route>', methods=['GET'])
 @response_wrapper
@@ -178,6 +206,7 @@ def routes():
 def search_stations():
     try:
         query = request.args['q']
+        system_filter = request.args.get('system', 'all')  # all, subway, mnr, lirr
     except KeyError as e:
         resp = Response(
             response=json.dumps({'error': 'Missing q parameter'}),
@@ -186,10 +215,20 @@ def search_stations():
         )
         return add_cors_header(resp)
 
-    data = mta.search_stations(query)
+    if system_filter == 'subway' or system_filter == 'all':
+        # Use original subway search for subway-only or include subway in unified search
+        if system_filter == 'subway':
+            data = mta.search_stations(query)
+            return {
+                'data': data,
+                'updated': mta.last_update()
+            }
+    
+    # Use unified search for multi-system search
+    data = unified_search.search_stations(query, system_filter)
     return {
         'data': data,
-        'updated': mta.last_update()
+        'updated': None  # Unified search doesn't have a last_update timestamp
     }
 
 def _envelope_reduce(a, b):

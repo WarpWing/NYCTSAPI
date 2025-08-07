@@ -211,7 +211,13 @@ class Mtapi(object):
             self._update()
 
         with self._read_lock:
-            out = [ self._stations[k].serialize() for k in ids ]
+            out = []
+            for id in ids:
+                if id in self._stations:
+                    out.append(self._stations[id].serialize())
+                elif id in self._stops_to_stations:
+                    parent_id = self._stops_to_stations[id]
+                    out.append(self._stations[parent_id].serialize())
 
         return out
 

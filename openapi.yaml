@@ -1,20 +1,26 @@
 openapi: 3.0.3
 info:
-  title: MTAPI
-  description: MTA's real-time subway, LIRR, and MNR feed exposed as a JSON API
-  version: 1.0.0
+  title: MTA API
+  description: Real-time NYC MTA subway, LIRR, and Metro-North data API with unified
+    search capabilities
+  version: 2.1.0
   contact:
+    name: MTAPI
     url: https://github.com/jonthornton/MTAPI
+  license:
+    name: BSD
+    url: https://github.com/jonthornton/MTAPI/blob/master/LICENSE
 servers:
-  - url: /
-    description: Default server
+- url: https://api.example.com
+  description: Production server
 paths:
   /:
     get:
-      summary: API information
+      summary: API Information
+      description: Get basic API information
       responses:
         '200':
-          description: API welcome message
+          description: API information
           content:
             application/json:
               schema:
@@ -22,83 +28,120 @@ paths:
                 properties:
                   title:
                     type: string
-                    example: MTAPI
                   readme:
                     type: string
-                    example: Visit https://github.com/jonthornton/MTAPI for more info
-  /by-location:
+  /search:
     get:
-      summary: Get subway stations by location
+      summary: Search Stations
+      description: Search for stations by name with keyword support across multiple
+        transit systems
       parameters:
-        - name: lat
-          in: query
-          required: true
-          schema:
-            type: number
-            format: float
-          description: Latitude coordinate
-        - name: lon
-          in: query
-          required: true
-          schema:
-            type: number
-            format: float
-          description: Longitude coordinate
+      - $ref: '#/components/parameters/SearchQuery'
+      - $ref: '#/components/parameters/SystemFilter'
       responses:
         '200':
-          description: Stations near the specified location
+          description: Search results
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/StationsEnvelope'
+                $ref: '#/components/schemas/SearchEnvelope'
         '400':
-          description: Missing lat/lon parameter
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /by-location:
+    get:
+      summary: Find Stations by Location
+      description: Find stations near the provided coordinates
+      parameters:
+      - $ref: '#/components/parameters/Latitude'
+      - $ref: '#/components/parameters/Longitude'
+      - name: system
+        in: query
+        description: Filter by transit system
+        schema:
+          type: string
+          enum:
+          - all
+          - subway
+          - lirr
+          - mnr
+          default: subway
+      - name: limit
+        in: query
+        description: Maximum number of results
+        schema:
+          type: integer
+          default: 5
+          minimum: 1
+          maximum: 50
+      - name: radius
+        in: query
+        description: Search radius in degrees
+        schema:
+          type: number
+          format: double
+          default: 0.01
+          minimum: 0.001
+      responses:
+        '200':
+          description: Nearby stations
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DataEnvelope'
+        '400':
+          description: Bad request
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
   /by-route/{route}:
     get:
-      summary: Get stations by route
+      summary: Get Stations by Route
+      description: Get all stations on the provided train route
       parameters:
-        - name: route
-          in: path
-          required: true
-          schema:
-            type: string
-          description: Route identifier (e.g., 4, 5, 6, N, Q, R, W)
+      - name: route
+        in: path
+        required: true
+        description: Route identifier
+        schema:
+          type: string
+        example: '6'
       responses:
         '200':
-          description: Stations on the specified route
+          description: Stations on route
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/StationsEnvelope'
-        '301':
-          description: Redirect to uppercase route
+                $ref: '#/components/schemas/DataEnvelope'
         '404':
           description: Route not found
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-  /by-id/{id_string}:
+  /by-id/{ids}:
     get:
-      summary: Get stations by ID
+      summary: Get Stations by ID
+      description: Get stations by their IDs (comma-separated)
       parameters:
-        - name: id_string
-          in: path
-          required: true
-          schema:
-            type: string
-          description: Comma-separated station IDs
+      - name: ids
+        in: path
+        required: true
+        description: Comma-separated station IDs
+        schema:
+          type: string
+        example: 125,A24
       responses:
         '200':
-          description: Stations with the specified IDs
+          description: Station data
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/StationsEnvelope'
+                $ref: '#/components/schemas/DataEnvelope'
         '404':
           description: Station not found
           content:
@@ -107,114 +150,61 @@ paths:
                 $ref: '#/components/schemas/Error'
   /routes:
     get:
-      summary: Get all subway routes
+      summary: List Available Routes
+      description: Get list of all available subway routes
       responses:
         '200':
-          description: List of all subway routes
+          description: Available routes
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  data:
-                    type: array
-                    items:
-                      type: string
-                  updated:
-                    type: string
-                    format: date-time
-  /search:
-    get:
-      summary: Search subway stations
-      parameters:
-        - name: q
-          in: query
-          required: true
-          schema:
-            type: string
-          description: Search query
-      responses:
-        '200':
-          description: Search results
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  data:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/StationSearchResult'
-                  updated:
-                    type: string
-                    format: date-time
-        '400':
-          description: Missing q parameter
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
+                $ref: '#/components/schemas/RoutesResponse'
   /lirr/routes:
     get:
-      summary: Get all LIRR routes
+      summary: Get LIRR Routes
+      description: Get all available LIRR routes
+      tags:
+      - LIRR
       responses:
         '200':
-          description: List of all LIRR routes
+          description: LIRR routes
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  data:
-                    type: array
-                    items:
-                      type: string
-                  updated:
-                    type: string
-                    format: date-time
+                $ref: '#/components/schemas/RoutesResponse'
   /lirr/stops:
     get:
-      summary: Get all LIRR stops
+      summary: Get All LIRR Stops
+      description: Get all LIRR stops with real-time data
+      tags:
+      - LIRR
       responses:
         '200':
-          description: List of all LIRR stops
+          description: All LIRR stops
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  data:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/RegionalStop'
-                  updated:
-                    type: string
-                    format: date-time
+                $ref: '#/components/schemas/DataEnvelope'
   /lirr/by-route/{route}:
     get:
-      summary: Get LIRR stops by route
+      summary: Get LIRR Stops by Route
+      description: Get all stops for a specific LIRR route
+      tags:
+      - LIRR
       parameters:
-        - name: route
-          in: path
-          required: true
-          schema:
-            type: string
-          description: LIRR route identifier
+      - name: route
+        in: path
+        required: true
+        description: LIRR route identifier
+        schema:
+          type: string
       responses:
         '200':
-          description: Stops on the specified LIRR route
+          description: LIRR stops on route
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  data:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/RegionalStop'
-                  updated:
-                    type: string
-                    format: date-time
+                $ref: '#/components/schemas/DataEnvelope'
         '404':
           description: Route not found
           content:
@@ -223,29 +213,24 @@ paths:
                 $ref: '#/components/schemas/Error'
   /lirr/by-id/{stop_id}:
     get:
-      summary: Get LIRR stop by ID
+      summary: Get LIRR Stop by ID
+      description: Get specific LIRR stop information
+      tags:
+      - LIRR
       parameters:
-        - name: stop_id
-          in: path
-          required: true
-          schema:
-            type: string
-          description: LIRR stop ID
+      - name: stop_id
+        in: path
+        required: true
+        description: LIRR stop identifier
+        schema:
+          type: string
       responses:
         '200':
-          description: LIRR stop information
+          description: LIRR stop data
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  data:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/RegionalStop'
-                  updated:
-                    type: string
-                    format: date-time
+                $ref: '#/components/schemas/DataEnvelope'
         '404':
           description: Stop not found
           content:
@@ -254,135 +239,93 @@ paths:
                 $ref: '#/components/schemas/Error'
   /lirr/search:
     get:
-      summary: Search LIRR stops
+      summary: Search LIRR Stops
+      description: Search LIRR stops by name
+      tags:
+      - LIRR
       parameters:
-        - name: q
-          in: query
-          required: true
-          schema:
-            type: string
-          description: Search query
+      - $ref: '#/components/parameters/SearchQuery'
       responses:
         '200':
-          description: Search results
+          description: LIRR search results
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  data:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/RegionalStopSearchResult'
-                  updated:
-                    type: string
-                    format: date-time
+                $ref: '#/components/schemas/SearchEnvelope'
         '400':
-          description: Missing q parameter
+          description: Bad request
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
   /lirr/by-location:
     get:
-      summary: Get LIRR stops by location
+      summary: Find LIRR Stops by Location
+      description: Find nearest LIRR stops to coordinates
+      tags:
+      - LIRR
       parameters:
-        - name: lat
-          in: query
-          required: true
-          schema:
-            type: number
-            format: float
-          description: Latitude coordinate
-        - name: lon
-          in: query
-          required: true
-          schema:
-            type: number
-            format: float
-          description: Longitude coordinate
+      - $ref: '#/components/parameters/Latitude'
+      - $ref: '#/components/parameters/Longitude'
       responses:
         '200':
-          description: LIRR stops near the specified location
+          description: Nearby LIRR stops
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  data:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/RegionalStop'
-                  updated:
-                    type: string
-                    format: date-time
+                $ref: '#/components/schemas/DataEnvelope'
         '400':
-          description: Missing lat/lon parameter
+          description: Bad request
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
   /mnr/routes:
     get:
-      summary: Get all MNR routes
+      summary: Get MNR Routes
+      description: Get all available Metro-North routes
+      tags:
+      - MNR
       responses:
         '200':
-          description: List of all MNR routes
+          description: MNR routes
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  data:
-                    type: array
-                    items:
-                      type: string
-                  updated:
-                    type: string
-                    format: date-time
+                $ref: '#/components/schemas/RoutesResponse'
   /mnr/stops:
     get:
-      summary: Get all MNR stops
+      summary: Get All MNR Stops
+      description: Get all Metro-North stops with real-time data
+      tags:
+      - MNR
       responses:
         '200':
-          description: List of all MNR stops
+          description: All MNR stops
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  data:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/RegionalStop'
-                  updated:
-                    type: string
-                    format: date-time
+                $ref: '#/components/schemas/DataEnvelope'
   /mnr/by-route/{route}:
     get:
-      summary: Get MNR stops by route
+      summary: Get MNR Stops by Route
+      description: Get all stops for a specific Metro-North route
+      tags:
+      - MNR
       parameters:
-        - name: route
-          in: path
-          required: true
-          schema:
-            type: string
-          description: MNR route identifier
+      - name: route
+        in: path
+        required: true
+        description: MNR route identifier
+        schema:
+          type: string
       responses:
         '200':
-          description: Stops on the specified MNR route
+          description: MNR stops on route
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  data:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/RegionalStop'
-                  updated:
-                    type: string
-                    format: date-time
+                $ref: '#/components/schemas/DataEnvelope'
         '404':
           description: Route not found
           content:
@@ -391,29 +334,24 @@ paths:
                 $ref: '#/components/schemas/Error'
   /mnr/by-id/{stop_id}:
     get:
-      summary: Get MNR stop by ID
+      summary: Get MNR Stop by ID
+      description: Get specific Metro-North stop information
+      tags:
+      - MNR
       parameters:
-        - name: stop_id
-          in: path
-          required: true
-          schema:
-            type: string
-          description: MNR stop ID
+      - name: stop_id
+        in: path
+        required: true
+        description: MNR stop identifier
+        schema:
+          type: string
       responses:
         '200':
-          description: MNR stop information
+          description: MNR stop data
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  data:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/RegionalStop'
-                  updated:
-                    type: string
-                    format: date-time
+                $ref: '#/components/schemas/DataEnvelope'
         '404':
           description: Stop not found
           content:
@@ -422,181 +360,246 @@ paths:
                 $ref: '#/components/schemas/Error'
   /mnr/search:
     get:
-      summary: Search MNR stops
+      summary: Search MNR Stops
+      description: Search Metro-North stops by name
+      tags:
+      - MNR
       parameters:
-        - name: q
-          in: query
-          required: true
-          schema:
-            type: string
-          description: Search query
+      - $ref: '#/components/parameters/SearchQuery'
       responses:
         '200':
-          description: Search results
+          description: MNR search results
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  data:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/RegionalStopSearchResult'
-                  updated:
-                    type: string
-                    format: date-time
+                $ref: '#/components/schemas/SearchEnvelope'
         '400':
-          description: Missing q parameter
+          description: Bad request
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
   /mnr/by-location:
     get:
-      summary: Get MNR stops by location
+      summary: Find MNR Stops by Location
+      description: Find nearest Metro-North stops to coordinates
+      tags:
+      - MNR
       parameters:
-        - name: lat
-          in: query
-          required: true
-          schema:
-            type: number
-            format: float
-          description: Latitude coordinate
-        - name: lon
-          in: query
-          required: true
-          schema:
-            type: number
-            format: float
-          description: Longitude coordinate
+      - $ref: '#/components/parameters/Latitude'
+      - $ref: '#/components/parameters/Longitude'
       responses:
         '200':
-          description: MNR stops near the specified location
+          description: Nearby MNR stops
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  data:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/RegionalStop'
-                  updated:
-                    type: string
-                    format: date-time
+                $ref: '#/components/schemas/DataEnvelope'
         '400':
-          description: Missing lat/lon parameter
+          description: Bad request
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
   /outages/search:
     get:
-      summary: Search outages by station
+      summary: Search Elevator/Escalator Outages
+      description: Find current and upcoming elevator/escalator outages
+      tags:
+      - Outages
       parameters:
-        - name: station
-          in: query
-          required: true
-          schema:
-            type: string
-          description: Station name to search for outages
+      - name: station
+        in: query
+        required: true
+        description: Station name (partial match supported)
+        schema:
+          type: string
       responses:
         '200':
-          description: Outage information for the station
+          description: Outage information
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/OutageResult'
+                $ref: '#/components/schemas/OutageResponse'
         '400':
-          description: Missing station parameter
+          description: Bad request
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
   /alerts/search:
     get:
-      summary: Search alerts
+      summary: Search Service Alerts
+      description: Search service alerts across transit systems
+      tags:
+      - Alerts
       parameters:
-        - name: q
-          in: query
-          required: true
-          schema:
-            type: string
-          description: Search query
-        - name: service
-          in: query
-          required: false
-          schema:
-            type: string
-            enum: [all, subway, lirr, mnr]
-            default: all
-          description: Service type filter
+      - $ref: '#/components/parameters/SearchQuery'
+      - name: service
+        in: query
+        description: Filter by service type
+        schema:
+          type: string
+          enum:
+          - all
+          - subway
+          - lirr
+          - mnr
+          default: all
       responses:
         '200':
-          description: Alert search results
+          description: Service alerts
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AlertResult'
+                $ref: '#/components/schemas/AlertResponse'
         '400':
-          description: Missing q parameter
+          description: Bad request
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
   /route-plan:
     get:
-      summary: Basic route planning
+      summary: Multi-Modal Route Planning
+      description: Basic multi-modal trip planning across subway, LIRR, and MNR
+      tags:
+      - Route Planning
       parameters:
-        - name: from_lat
-          in: query
-          required: true
-          schema:
-            type: number
-            format: float
-          description: Origin latitude
-        - name: from_lon
-          in: query
-          required: true
-          schema:
-            type: number
-            format: float
-          description: Origin longitude
-        - name: to_lat
-          in: query
-          required: true
-          schema:
-            type: number
-            format: float
-          description: Destination latitude
-        - name: to_lon
-          in: query
-          required: true
-          schema:
-            type: number
-            format: float
-          description: Destination longitude
+      - name: from_lat
+        in: query
+        required: true
+        description: Origin latitude
+        schema:
+          type: number
+          format: double
+      - name: from_lon
+        in: query
+        required: true
+        description: Origin longitude
+        schema:
+          type: number
+          format: double
+      - name: to_lat
+        in: query
+        required: true
+        description: Destination latitude
+        schema:
+          type: number
+          format: double
+      - name: to_lon
+        in: query
+        required: true
+        description: Destination longitude
+        schema:
+          type: number
+          format: double
       responses:
         '200':
           description: Route planning suggestions
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/RoutePlanResult'
+                $ref: '#/components/schemas/RoutePlanResponse'
         '400':
-          description: Missing or invalid parameters
+          description: Bad request
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
 components:
   schemas:
-    Error:
+    Station:
       type: object
       properties:
-        error:
+        id:
           type: string
-    StationsEnvelope:
+          description: Station ID
+        name:
+          type: string
+          description: Station name
+        location:
+          type: array
+          items:
+            type: number
+          minItems: 2
+          maxItems: 2
+          description: Station coordinates [latitude, longitude]
+        system:
+          type: string
+          enum:
+          - subway
+          - lirr
+          - mnr
+          description: Transit system
+        routes:
+          type: array
+          items:
+            type: string
+          description: Routes serving this station
+        stops:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: number
+            minItems: 2
+            maxItems: 2
+          description: Individual platform/stop coordinates
+        N:
+          type: array
+          items:
+            $ref: '#/components/schemas/Train'
+          description: Northbound trains
+        S:
+          type: array
+          items:
+            $ref: '#/components/schemas/Train'
+          description: Southbound trains
+        hasData:
+          type: boolean
+          description: Whether station has real-time data
+        last_update:
+          type: string
+          format: date-time
+          description: Last update timestamp
+    SearchResult:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Station ID
+        name:
+          type: string
+          description: Station name
+        location:
+          type: array
+          items:
+            type: number
+          minItems: 2
+          maxItems: 2
+          description: Station coordinates [latitude, longitude]
+        system:
+          type: string
+          enum:
+          - subway
+          - lirr
+          - mnr
+          description: Transit system
+        distance:
+          type: number
+          description: Distance from search point (location searches only)
+    Train:
+      type: object
+      properties:
+        route:
+          type: string
+          description: Train route
+        time:
+          type: string
+          format: date-time
+          description: Expected arrival time
+    DataEnvelope:
       type: object
       properties:
         data:
@@ -606,151 +609,37 @@ components:
         updated:
           type: string
           format: date-time
-    Station:
+          nullable: true
+          description: Last update timestamp
+    SearchEnvelope:
       type: object
       properties:
-        id:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/SearchResult'
+        updated:
           type: string
-        name:
-          type: string
-        location:
-          type: array
-          items:
-            type: number
-            format: float
-          minItems: 2
-          maxItems: 2
-        stops:
-          type: object
-          additionalProperties:
-            type: array
-            items:
-              type: number
-              format: float
-        N:
-          type: array
-          items:
-            $ref: '#/components/schemas/Train'
-        S:
-          type: array
-          items:
-            $ref: '#/components/schemas/Train'
-        routes:
+          format: date-time
+          nullable: true
+          description: Last update timestamp
+    RoutesResponse:
+      type: object
+      properties:
+        data:
           type: array
           items:
             type: string
-        last_update:
+        updated:
           type: string
           format: date-time
-    Train:
+    Error:
       type: object
       properties:
-        route:
+        error:
           type: string
-        time:
-          type: string
-          format: date-time
-    StationSearchResult:
-      type: object
-      properties:
-        id:
-          type: string
-        name:
-          type: string
-        location:
-          type: array
-          items:
-            type: number
-            format: float
-          minItems: 2
-          maxItems: 2
-    RegionalStop:
-      type: object
-      properties:
-        id:
-          type: string
-        name:
-          type: string
-        location:
-          type: array
-          items:
-            type: number
-            format: float
-          minItems: 2
-          maxItems: 2
-        url:
-          type: string
-        code:
-          type: string
-        wheelchair_boarding:
-          type: string
-        trains:
-          type: object
-          properties:
-            N:
-              type: array
-              items:
-                $ref: '#/components/schemas/RegionalTrain'
-            S:
-              type: array
-              items:
-                $ref: '#/components/schemas/RegionalTrain'
-        last_update:
-          type: string
-          format: date-time
-    RegionalTrain:
-      type: object
-      properties:
-        route:
-          type: string
-        route_name:
-          type: string
-        time:
-          type: string
-          format: date-time
-        trip_id:
-          type: string
-        departure_time:
-          type: string
-          format: date-time
-        departure_time_formatted:
-          type: string
-        arrival_time:
-          type: string
-          format: date-time
-        arrival_time_formatted:
-          type: string
-        origin_departure:
-          type: string
-          format: date-time
-        origin_departure_formatted:
-          type: string
-        origin_station:
-          type: string
-        harlem_departure:
-          type: string
-          format: date-time
-        harlem_departure_formatted:
-          type: string
-        harlem_station:
-          type: string
-    RegionalStopSearchResult:
-      type: object
-      properties:
-        id:
-          type: string
-        name:
-          type: string
-        location:
-          type: array
-          items:
-            type: number
-            format: float
-          minItems: 2
-          maxItems: 2
-        code:
-          type: string
-    OutageResult:
+          description: Error message
+    OutageResponse:
       type: object
       properties:
         station:
@@ -783,7 +672,7 @@ components:
           type: string
         ada_accessible:
           type: boolean
-    AlertResult:
+    AlertResponse:
       type: object
       properties:
         query:
@@ -814,21 +703,19 @@ components:
           type: array
           items:
             type: object
-    RoutePlanResult:
+    RoutePlanResponse:
       type: object
       properties:
         from_point:
           type: array
           items:
             type: number
-            format: float
           minItems: 2
           maxItems: 2
         to_point:
           type: array
           items:
             type: number
-            format: float
           minItems: 2
           maxItems: 2
         options:
@@ -853,3 +740,56 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Station'
+  parameters:
+    SystemFilter:
+      name: system
+      in: query
+      description: Filter by transit system
+      required: false
+      schema:
+        type: string
+        enum:
+        - all
+        - subway
+        - lirr
+        - mnr
+        default: all
+    SearchQuery:
+      name: q
+      in: query
+      description: Search query - supports multiple keywords
+      required: true
+      schema:
+        type: string
+      example: grand central
+    Latitude:
+      name: lat
+      in: query
+      description: Latitude coordinate
+      required: true
+      schema:
+        type: number
+        format: double
+      example: 40.7589
+    Longitude:
+      name: lon
+      in: query
+      description: Longitude coordinate
+      required: true
+      schema:
+        type: number
+        format: double
+      example: -73.9851
+tags:
+- name: Subway
+  description: NYC Subway endpoints
+- name: LIRR
+  description: Long Island Rail Road endpoints
+- name: MNR
+  description: Metro-North Railroad endpoints
+- name: Outages
+  description: Elevator and escalator outage information
+- name: Alerts
+  description: Service alerts and disruptions
+- name: Route Planning
+  description: Multi-modal trip planning
