@@ -1,0 +1,58 @@
+services:
+  - type: web
+    name: mtapi
+    env: python
+    buildCommand: |
+      # Enable Git LFS
+      git lfs install
+      git lfs pull
+      
+      # Install dependencies
+      pip install -r requirements.txt
+      
+      # Create data directories
+      mkdir -p data/lirr data/mnr data/gtfs data/alerts data/outages
+      
+      # Download LIRR GTFS data (as per README)
+      cd data/lirr
+      curl -O https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/lirr%2Fgtfs.zip
+      unzip gtfs.zip && rm gtfs.zip
+      cd ../..
+      
+      # Download MNR GTFS data (as per README)
+      cd data/mnr
+      curl -O https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/mnr%2Fgtfs.zip
+      unzip gtfs.zip && rm gtfs.zip
+      cd ../..
+      
+      # Generate station files (as per README)
+      python3 scripts/make_mnr_stations.py > data/mnr-stations.json || echo '{}' > data/mnr-stations.json
+      python3 scripts/make_lirr_stations.py > data/lirr-stations.json || echo '{}' > data/lirr-stations.json
+      python3 scripts/make_stations_csv.py data/gtfs/stops.txt data/gtfs/transfers.txt > data/stations.csv || touch data/stations.csv
+      python3 scripts/make_stations_json.py data/stations.csv > data/stations.json || echo '{}' > data/stations.json
+      
+      # Download realtime protobuf files
+      curl -o data/lirr/gtfs-lirr-realtime.pb "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/lirr%2Fgtfs-lirr" || touch data/lirr/gtfs-lirr-realtime.pb
+      curl -o data/mnr/gtfs-mnr-realtime.pb "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/mnr%2Fgtfs-mnr" || touch data/mnr/gtfs-mnr-realtime.pb
+      
+      # Download alert data
+      curl -o data/alerts/lirr-alerts.json "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/lirr%2Falerts" || echo '[]' > data/alerts/lirr-alerts.json
+      curl -o data/alerts/mnr-alerts.json "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/mnr%2Falerts" || echo '[]' > data/alerts/mnr-alerts.json  
+      curl -o data/alerts/subway-alerts.json "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/camsys%2Fsubway-alerts" || echo '[]' > data/alerts/subway-alerts.json
+      
+      # Download outage data
+      curl -o data/outages/nyct_ene.json "https://www.nycsubway.org/nyct/ene/ene.json" || echo '{}' > data/outages/nyct_ene.json
+      curl -o data/outages/nyct_ene_equipments.json "https://www.nycsubway.org/nyct/ene/equipments.json" || echo '{}' > data/outages/nyct_ene_equipments.json
+      curl -o data/outages/nyct_ene_upcoming.json "https://www.nycsubway.org/nyct/ene/upcoming.json" || echo '{}' > data/outages/nyct_ene_upcoming.json
+      
+    startCommand: "gunicorn app:app"
+    
+    envVars:
+      - key: MTAPI_SETTINGS
+        value: ./settings.cfg
+        
+      - key: FLASK_ENV
+        value: production
+        
+      - key: PYTHONPATH
+        value: .
